@@ -1,6 +1,7 @@
 # PyMoMAG
 Very simple macroalgal growth model that evolves a biomass $B$ as follows:
-$\frac{dB}{dt} = GB - MB^2$, where $G,M$ are growth and mortality rates, heavily informed by SBC LTER data from MoHawk Reef (for now).
+$$\frac{dB}{dt} = GB - MB^2$$, 
+where $G,M$ are growth and mortality rates, heavily informed by SBC LTER data from MoHawk Reef (for now).
 
 To run the model:
 - put forcing (nitrate, temp, PAR) into a netcdf
