@@ -95,7 +95,7 @@ def write_to_nc(mdict, sim_name):
     ncout.createDimension('time', None)
 
     #CREATE AND WRITE VARIABLES
-    tvec_nc = ncout.createVariable('tvec', 'f8', ('time'))
+    tvec_nc = ncout.createVariable('mag_time', 'f4', ('time'))
     setattr(tvec_nc, 'long_name', 'time since initialization')
     setattr(tvec_nc, 'units', 'seconds')
     tvec_nc[:] = mdict['tvec'][:]
@@ -138,6 +138,33 @@ def create_tvec(tend,dt):
     return np.arange(0,tend+dt,dt)
 
 
+
+def set_frc_data(nc_frc,mdict):
+    '''
+    Read in and set forcing variables (no3, temp, PAR)
+
+    Inputs
+    nc_frc --> netcdf object with forcing data (time-series or 2D [z,t] arrays)
+    mdict  --> MAG dictionary with other relevant variables (e.g., tvec)
+
+    Returns
+    updated mdict with time-interpolated no3, temp, PAR to solution tvec
+    '''
+    print('Setting frc data')
+    #Load forcing dataset
+    frc_time = nc_frc.variables['frc_time'][:]
+    no3_frc  = nc_frc.variables['no3'][:]
+    temp_frc = nc_frc.variables['temp'][:]
+    PAR_frc  = nc_frc.variables['PAR'][:]
+    #Interpolate to solution time
+    mdict['no3'] = np.interp(mdict['tvec'],frc_time,no3_frc)
+    mdict['temp'] = np.interp(mdict['tvec'],frc_time,temp_frc)
+    mdict['PAR'] = np.interp(mdict['tvec'],frc_time,PAR_frc)
+    return mdict
+    ###############################################
+
+
+
       ############################################################
       #             TIME-STEPPING SUBROUTINES
 '''
@@ -146,14 +173,14 @@ def create_tvec(tend,dt):
 '''
       ############################################################
 
-def compute_growth(no3,temp,PAR,Gmax=1.):
+def compute_growth(n,mdict,Gmax=1.):
     '''
     Compute growht rate [1/s] at a time-step as a function of
     nutrient (no3), light (PAR), and temperature
 
     G = Gmax *  (Gno3 * GPAR * Gtemp)
 
-    Inputs
+    Inputs (in mdict dictionary)
     no3 --> float or 1D array [mg N / m^2]
     PAR --> float or 1D array[UNITS]
     temp --> float or 1D array [deg c]
@@ -162,9 +189,14 @@ def compute_growth(no3,temp,PAR,Gmax=1.):
     growth rate (G) --> float or 1D array [1/s]
     '''
     #Temporary
-    Gno3 = 1
-    GPAR = 1
-    Gtemp = 1
+    no3 = mdict['no3'][n]
+    temp = mdict['temp'][n]
+    PAR  = mdict['PAR'][n]
+    Kno3 = mdict['Kno3']
+    #Simple michaeles-menten
+    Gno3 = no3 / (no3 + Kno3)
+    GPAR = 1.
+    Gtemp = 1.
     return Gmax * Gno3 * GPAR * Gtemp
     ###################################################
 
@@ -202,7 +234,7 @@ def time_step(mdict):
 
     for n in range(nt-1):
         #Compute growth and loss rates at time-step = n
-        mdict['G'][n] = compute_growth(no3[n], temp[n], PAR[n],Gmax=Gmax)
+        mdict['G'][n] = compute_growth(n,mdict,Gmax=Gmax)
         mdict['M'][n] = compute_loss(M0=L0)
         if n<=2:
            #Forward euler for first 2 time-ste[s
@@ -221,7 +253,7 @@ def time_step(mdict):
 
 
     #Calculate rates for last time-step
-    mdict['G'][n+1] = compute_growth(no3[n+1], temp[n+1], PAR[n+1],Gmax=Gmax)
+    mdict['G'][n+1] = compute_growth(n+1,mdict,Gmax=Gmax)
     mdict['M'][n+1] = compute_loss(M0=L0)
     #Return dictionary with updated arrays
     return mdict

@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import maglib as maglib
 import sys as sys
 import configparser
+from netCDF4 import Dataset as netcdf
 #########################
 '''
 Solving ODE for biomass B
@@ -37,7 +38,7 @@ L0    = float(config['PARAM']['L0'])
 Gmax  = float(config['PARAM']['Gmax'])
 tend  = float(config['PARAM']['tend']) * 86400. #convert to sec
 dt   = float(config['PARAM']['dt'])
-
+Kno3 = float(config['PARAM']['Kno3'])
 
 ##################################################
 #Initialize dictionary with all relevant variables
@@ -47,6 +48,7 @@ mdict['tvec'] = maglib.create_tvec(tend,dt)
 #Get number of time-steps
 nt = len(mdict['tvec'])
 ##################################################
+
 
 ##################################################
 #Setup dictionary with relevant arrays
@@ -60,10 +62,19 @@ mdict = maglib.setup_mag_dict(nt,mdict)
 mdict['Gmax'] = Gmax
 mdict['L0'] = L0
 mdict['dt'] = dt
+mdict['Kno3'] = Kno3
 
 #Initialize biomass
 mdict['B'][0] = B0
+
+#Read in forcing file with no3, temp, PAR
+nc_frc = netcdf(config['PARAM']['frc_path'], 'r')
+#Read in forcing and interpolate
+mdict = maglib.set_frc_data(nc_frc,mdict)
 ##################################################
+
+
+
 
 #######################
 #Time-step
